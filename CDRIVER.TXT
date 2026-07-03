@@ -1,0 +1,114 @@
+01-12-91 ras - initial entry
+
+This set of modules comprise an example OS/2 Device Driver, written
+primarily in 'C'.  The purpose of this distribution is to give other
+OS/2 developers an example of a 'real' device driver that they can
+use to build other drivers.  The source code is copyrighted, and part
+of a product that we market for many thousands of dollars.  However,
+I feel that the code is so special purpose in application, that no
+real competitive advantage would be lost by distributing it to
+other interested OS/2 developers.  Feel free to use it to explore
+how to build OS/2 device drivers in C.  Obviously we make no warranties
+regarding its correctness nor usefulness, and assume no liabilities for 
+any uses you might make of the code.  I will not provide any support
+and may or may not redistribute any corrections I or others find.
+
+If you wish to make any comments regarding the driver, I can usually
+be contacted as following:
+
+    Richard Stafford
+    Byers Engineering Company
+    6285 Barfield Rd
+    Atlanta, GA 30328
+
+    or: CompuServe:             73750,2305
+        OS/2 Shareware BBS      703-385-4325
+
+This driver is an early version of a driver I use to control the 
+interface to large format, high speed raster plotters.  It is used 
+to output monochrome bit map images of up to about 20,000 pixels wide,
+by any number of pixels long, at a data rate of up to 700,000 bytes 
+per second.
+
+The driver is used with an Ikon 10092 interface adaptor for the
+ISA bus.  This adaptor is operated under Interrupt control, and
+uses DMA for transferring the raster images from memory buffers
+to the raster plotter.  Some information regarding the operation
+of the adaptor can be gleaned from the BIKONC.C module #def's.
+
+Please note that this driver is intended to operate in Protected
+mode only.  It does not properly handle the case of being called
+from the DOS box in real mode, nor does its Interrupt Service
+routine handle interrupts while in real mode.  The target environment
+for this product is a protected mode only machine, and having to handle
+the real mode cases would complicate the driver with no real gain.
+
+Using this driver as an example, it should be possible to write
+other OS/2 drivers using only the OS/2 PM Toolkit, and the book 
+"Writing OS/2 Device Drivers" by Raymond Westwater.  The Microsoft 
+OS/2 Device Driver Kit is not necessary, though it is useful as an
+alternative view of some of the things in Westwater's book.  However, 
+neither of these sources address development of drivers in C.  
+
+After having written several OS/2 drivers in both MASM and C, I 
+greatly recommend the C approach.  Only if you have to handle the 
+real mode case, where you have to be really careful with segment 
+registers, would I see any benefit to MASM code.  This driver
+handles a fairly complicated device, using Interrupts, DMA, and
+IOCTL, and still is only about 3600 bytes long, including data
+structures.  It would not benefit much in either speed or size
+by having been written solely in MASM.
+
+The following files are included in this distribution:
+
+    CDRIVER.DOC   this file
+    CDRIVER.H     general include file for writing C drivers
+    BYTYPES.H     include file defining some names for int, long, etc
+    BIKON.H       include file specific to this driver
+    BIKONA.ASM    primary interface between the C modules and OS/2,
+                  includes the strategy entry point and some interfaces
+                  between C and OS/2 DevHlp modules
+    BIKONC.C      all adaptor interface code resides in this module
+    BIKON.DEF     a linker .DEF file
+    TEST_IK.C     a module to demonstrate calls to the device driver
+
+As we use the Polytron MAKE tool, not the Microsoft MAKE tool, I have
+not included the complete set of make instructions.  However, the following
+should be sufficient for anyone knowledgeble enough to write a driver:
+
+To produce BIKONA.OBJ
+
+ MASM BIKONA, BIKONA/ZI;
+
+To produce BIKONC.OBJ
+
+ CL -Ox -Zip -G2s -W2 -J -FPi -AL -Aw -c BIKONC.c
+
+To produce BIKON.OS2
+
+ LINK BIKONA+BIKONC, 
+      bikon.os2, 
+      bikon.map, 
+      \msc\lib\os2.lib,
+      bikon.def /EXEPACK/NOE/NOD
+
+There are several methods for testing of OS/2 device drivers.  One method
+is to use the Debug Kernal that comes with the OS/2 2.0 SDK or the
+Device Driver Kit from Microsoft.  An alternative method that we used
+involved the RAMSCOPE tool.  This shareware tool allows you to display,
+in a PM window, the contents of any area of physical memory.  We used
+this tool to watch the driver data structures and gain hints as to
+what was going on.  This tool is available on the OS/2 Shareware BBS.
+
+The following tools were used to perform this development:
+
+  IBM OS/2 1.3 on a 486/33 clone with 8mb ram and 300mb disk
+  MSC 6.00A
+  MASM 5.10
+  MS Segmented-Executable Linker 5.10
+  MS PM Toolkit 1.2
+  Brief 3.0
+  Ramscope 2.0
+
+I hope you find this information useful.  Good luck on your device 
+driver development.

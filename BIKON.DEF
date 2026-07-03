@@ -1,0 +1,13 @@
+; Default Module Definition for 'C' mode OS/2 Device Drivers
+;
+; 12-21-90 ras - SCR P0487, initial entry
+
+LIBRARY
+
+PROTONLY
+
+SEGMENTS
+  _DATA		CLASS 'DATA'
+  CONST		CLASS 'CONST'
+  _BSS		CLASS 'BSS'
+  _TEXT 	CLASS 'CODE'
