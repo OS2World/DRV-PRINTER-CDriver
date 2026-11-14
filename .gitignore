@@ -1,0 +1,11 @@
+*.obj
+*.map
+*.err
+*.lnk
+bin/
+compile.log
+*.tmp
+*.bak
+*.old
+.DS_Store
+Thumbs.db

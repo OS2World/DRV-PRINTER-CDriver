@@ -1,0 +1,16 @@
+# Normalize line endings and preserve file types
+* text=auto eol=crlf
+*.c text
+*.h text
+*.asm text
+*.md text
+*.txt text
+*.ln text
+*.cmd text
+*.def text
+*.lib binary
+*.obj binary
+*.sys binary
+*.exe binary
+*.ln binary
+*.map binary

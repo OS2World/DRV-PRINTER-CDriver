@@ -25,25 +25,25 @@
 
 ; define public symbols available in this module
 		public	_Drv_qDevHlpAddr
-		public	HlpVerifyAccess
-		public	HlpPhysToUVirt
-		public	HlpSetIRQ
-		public	HlpUnSetIRQ
-		public	HlpEOI
-		public	HlpRegisterStack
-		public	HlpQueueInit
-		public	HlpQueueRead
-		public	HlpQueueWrite
-		public	HlpQueueFlush
-		public	HlpBlock
-		public	HlpRun
-		public	HlpPullReqPkt
-		public	HlpPushReqPkt
-		public	HlpVirtToPhys
-		public	HlpLock
-		public	HlpUnLock
-		public	HlpAllocGDTSel
-		public	HlpPhysToGDTSel
+		public	HLPVERIFYACCESS
+		public	HLPPHYSTOUVIRT
+		public	HLPSETIRQ
+		public	HLPUNSETIRQ
+		public	HLPEOI
+		public	HLPREGISTERSTACK
+		public	HLPQUEUEINIT
+		public	HLPQUEUEREAD
+		public	HLPQUEUEWRITE
+		public	HLPQUEUEFLUSH
+		public	HLPBLOCK
+		public	HLPRUN
+		public	HLPPULLREQPKT
+		public	HLPPUSHREQPKT
+		public	HLPVIRTTOPHYS
+		public	HLPLOCK
+		public	HLPUNLOCK
+		public	HLPALLOCGDTSEL
+		public	HLPPHYSTOGDTSEL
 
 ; define driver literals
 BPT			equ	byte ptr
