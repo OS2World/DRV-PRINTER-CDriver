@@ -38,6 +38,7 @@
 #include <dos.h>				// DOS    defines
 #include "cdriver.h"				// OS/2 C defines
 #include "bikon.h"				// IKON   defines
+#include "version.h"				// Version info
 
 // verify compiled using LARGE model
 #ifndef	M_I86LM
@@ -79,6 +80,39 @@ static void  _near 	     L_LastCode(	 void 			);
 #pragma alloc_text( _TEXT, L_StartControl	)
 #pragma alloc_text( _TEXT, L_StartDma		)
 #pragma alloc_text( _TEXT, L_LastCode		)
+
+// force allocation of init functions to _INITCODE (discardable after init)
+#pragma alloc_text( _INITCODE, L_ReqInit	)
+#pragma alloc_text( _INITCODE, L_ParseArgs	)
+#pragma alloc_text( _INITCODE, L_Emit		)
+#pragma alloc_text( _INITCODE, L_AddNum		)
+#pragma alloc_text( _INITCODE, L_AddStr		)
+#pragma alloc_text( _INITCODE, L_Slen		)
+#pragma alloc_text( _INITCODE, L_Upc		)
+#pragma alloc_text( _INITCODE, L_WaitKey	)
+
+// declare init functions
+static void  _near 	     L_ReqInit(		 DRV_REQ    *pDrvReq	);
+static void  _near 	     L_ParseArgs(	 const char FAR *p	);
+static void  _near 	     L_Emit(		 const char *msg	);
+static int   _near 	     L_Slen(		 const char *s	);
+static int   _near 	     L_Upc(		 int		c	);
+static void  _near 	     L_AddNum(	 unsigned value, int hex );
+static void  _near 	     L_AddStr(	 const char *s	);
+static void  _near 	     L_WaitKey(	 void		);
+
+// boot message prefix
+#define PREFIX  "BYIKON: "
+
+// options on the DEVICE= line
+static int fVerbose, fQuiet, fWait, fBeep;
+
+// static work areas: the driver runs with SS != DS, so nothing that a DOS
+// call sees may live on the stack
+static USHORT done, got;
+static char   key;
+static char   line[96];
+static char   text[160];
 
 // define Interrupt service modes, used by L_InterruptService()
 // to determine next action to perform.  these values are
@@ -1503,6 +1537,155 @@ static void _near 	L_LastCode(	void	)
 
 /****************************************************************************
 
+	---- small helpers (no C library in a device driver) ----------------------
+****************************************************************************/
+
+// string length
+static int _near L_Slen( const char *s )
+{
+    int n = 0;
+    while( s[n] )
+        n++;
+    return n;
+}
+
+// uppercase a character
+static int _near L_Upc( int c )
+{
+    return (c >= 'a' && c <= 'z') ? c - 32 : c;
+}
+
+// Print one message: "BYIKON: text", wrapped at 79 columns, prefix on every line.
+static void _near L_Emit( const char *msg )
+{
+    int len, n, cut, i, k;
+    const int prefix = sizeof( PREFIX ) - 1;
+    const int width  = 79 - prefix - 2;
+
+    if( fQuiet )
+        return;
+    len = L_Slen( msg );
+    while( len > 0 ) {
+        n = len;
+        if( n > width ) {
+            cut = width;
+            while( cut > 0 && msg[cut] != ' ' )
+                cut--;
+            n = cut ? cut : width;
+        }
+        k = 0;
+        for( i = 0; i < prefix; i++ )
+            line[k++] = PREFIX[i];
+        for( i = 0; i < n; i++ )
+            line[k++] = msg[i];
+        line[k++] = '\r';
+        line[k++] = '\n';
+        DosWrite( 1, (void FAR *)line, k, (USHORT FAR *)&done );
+        msg += n;
+        len -= n;
+        if( len > 0 && *msg == ' ' ) {
+            msg++;
+            len--;
+        }
+    }
+}
+
+// append the text of a value to text[]
+static void _near L_AddNum( unsigned value, int hex )
+{
+    static const char digits[] = "0123456789ABCDEF";
+    char tmp[8];
+    int  n = 0, i, base = hex ? 16 : 10;
+
+    do {
+        tmp[n++] = digits[value % base];
+        value /= base;
+    } while( value );
+    i = L_Slen( text );
+    if( hex ) {
+        text[i++] = '0';
+        text[i++] = 'x';
+    }
+    while( n )
+        text[i++] = tmp[--n];
+    text[i] = 0;
+}
+
+static void _near L_AddStr( const char *s )
+{
+    int i = L_Slen( text ), j = 0;
+
+    while( s[j] && i < (int)sizeof( text ) - 1 )
+        text[i++] = s[j++];
+    text[i] = 0;
+}
+
+/* DEVICE=...\BYIKON.SYS [/V] [/Q] [/W] [/AA]
+   Unknown options and extra words are ignored, as in the original driver. */
+static void _near L_ParseArgs( const char FAR *p )
+{
+    if( p == 0 )
+        return;
+
+    while( *p == ' ' || *p == '\t' )
+        p++;
+    while( *p && *p != ' ' && *p != '\t' )
+        p++;                                  /* skip the driver file name */
+
+    for( ;; ) {
+        while( *p == ' ' || *p == '\t' )
+            p++;
+        if( *p == 0 || *p == '\r' || *p == '\n' )
+            break;
+        if( *p == '/' || *p == '-' ) {
+            p++;
+            if( L_Upc( p[0] ) == 'A' && L_Upc( p[1] ) == 'A' ) {
+                fBeep = 1;
+                p += 2;
+            } else {
+                switch( L_Upc( *p ) ) {
+                case 'V':
+                    fVerbose = 1;
+                    break;
+                case 'Q':
+                    fQuiet = 1;
+                    break;
+                case 'W':
+                    fWait = 1;
+                    break;
+                default:
+                    break;                    /* unknown options are ignored */
+                }
+                if( *p )
+                    p++;
+            }
+        } else {
+            while( *p && *p != ' ' && *p != '\t' )
+                p++;                          /* ignore other arguments */
+        }
+    }
+}
+
+// diagonal test: only /W, no other options
+// temporary diagnostic: print what the console read returns
+static void _near L_WaitKey( void )
+{
+    USHORT rc;
+
+    L_Emit( "Press any key to continue." );
+    rc = DosRead( 0, (void FAR *)&key, 1, (USHORT FAR *)&got );
+    if( fVerbose ) {
+        text[0] = 0;
+        L_AddStr( "Console read: rc " );
+        L_AddNum( rc, 0 );
+        L_AddStr( ", got " );
+        L_AddNum( got, 0 );
+        L_Emit( text );
+    }
+}
+
+/****************************************************************************
+
 	static void _near L_ReqInit( DRV_REQ *pDrvReq	)
 
 	This function performs config.sys load time driver initialization.
@@ -1522,9 +1705,15 @@ static void _near L_ReqInit( DRV_REQ *pDrvReq	)
 
   {	// define automatics
 	uint16		nWrLen;			// DosWrite length
+	unsigned char status;
+	int ok;
 
 	// save DevHlp address
 	Drv_qDevHlpAddr = pDrvReq->Init.In.qDevHlpAddr;
+
+	/* the arguments live in the INIT packet, which the output fields overwrite;
+	   so read them before writing the output fields */
+	L_ParseArgs( (const char FAR *)pDrvReq->Init.In.qInitArgAddr );
 
 	// save code and data offset values in request header
 	pDrvReq->Init.Out.nCodeEnd = (uint16) &L_LastCode;
@@ -1533,14 +1722,58 @@ static void _near L_ReqInit( DRV_REQ *pDrvReq	)
 	// init the Bpb address field
 	pDrvReq->Init.Out.qBpbAddr = 0;
 
-	// display driver signon
-	DosWrite( 1,
-	    	  &L_acMsg[0],
-		  sizeof(L_acMsg),
-		  &nWrLen );
+	// check for IKON adaptor at default I/O base
+	status = (unsigned char)inp( IO_BASE_ADDR + IO_IN_ISTAT_OFF );
+	if( status == 0xFF ) {
+	    ok = 0;                               /* nothing at I/O base */
+	} else {
+	    // reset adaptor interface logic
+	    outp( IO_BASE_ADDR + IO_OUT_REMOTE_OFF, IO_REMOTE_HI_RESET_ADP );
+	    // verify latched function register is all zero
+	    ok = (inp( IO_BASE_ADDR + IO_IN_SETUP_OFF ) == 0);
+	}
+
+	if( ok ) {
+	    if( fVerbose ) {
+	        text[0] = 0;
+	        L_AddStr( "BYIKON.SYS version " VER_STRING " (" VER_DATE ")." );
+	        L_Emit( text );
+	        text[0] = 0;
+	        L_AddStr( "IKON adaptor found at I/O base 0x" );
+	        L_AddNum( IO_BASE_ADDR, 1 );
+	        L_AddStr( " (status " );
+	        L_AddNum( status, 1 );
+	        L_AddStr( ")." );
+	        L_Emit( text );
+	    }
+	    if( fWait && !fQuiet )
+	        L_WaitKey();
+	    if( fBeep )
+	        DosBeep( 1000, 120 );
+	} else {
+	    text[0] = 0;
+	    L_AddStr( "BYIKON.SYS could not be loaded. " );
+	    if( status == 0xFF ) {
+	        L_AddStr( "No IKON adaptor was found at I/O base 0x" );
+	        L_AddNum( IO_BASE_ADDR, 1 );
+	        L_AddStr( " (port reads 0xFF)." );
+	    } else {
+	        L_AddStr( "The IKON adaptor at I/O base 0x" );
+	        L_AddNum( IO_BASE_ADDR, 1 );
+	        L_AddStr( " did not accept the reset sequence." );
+	    }
+	    L_Emit( text );
+	    if( fWait && !fQuiet )
+	        L_WaitKey();
+	}
 
 	// register our interrupt stack usage
 	HlpRegisterStack( (uint16) &L_RegStack );
+
+	if( ok )
+	    pDrvReq->nStatus |= 0x0100;  // RPDONE
+	else
+	    pDrvReq->nStatus |= 0x8100 | 0x0001;  // RPDONE | RPERR | RPERR_GENERAL
 
 	// return to caller
 	return;
