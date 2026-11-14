@@ -1,0 +1,5 @@
+# bldlevel.lnk - BLDLEVEL signature for BYIKON.SYS
+# Read it with:  bldlevel bin\bikon.sys
+# Format: @#vendor:version#@##1## build date  build machine::language:buildlevel:fixpack::0::@@description
+# The version and the date must match src\version.h.
+option description '@#OS2World:0.0.1#@##1## 14 Nov 2026 00:00:00     ArcaOS-Dev::::0::@@Byers IKON 10092 plotter driver'

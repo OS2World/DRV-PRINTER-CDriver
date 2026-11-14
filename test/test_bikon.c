@@ -47,8 +47,8 @@ typedef struct {
 
 int main(void) {
     HFILE hf;
-    ULONG ulAction;
-    APIRET rc;
+    USHORT ulAction;
+    USHORT rc;
     IK_REQ req;
     IK_CFG_PARM cfg;
 
@@ -62,8 +62,8 @@ int main(void) {
                  0);
 
     if (rc != 0) {
-        printf("DosOpen failed: rc = %lu\n", rc);
-        if (rc == ERROR_FILE_NOT_FOUND) {
+        printf("DosOpen failed: rc = %u\n", rc);
+        if (rc == 2) {  /* ERROR_FILE_NOT_FOUND = 2 */
             printf("Device BYIKON$$ not found. Is the driver loaded?\n");
         }
         return 1;
@@ -77,12 +77,11 @@ int main(void) {
     req.qBufSize = sizeof(cfg);
     req.fpcBuf = &cfg;
 
-    rc = DosDevIOCTL(hf, IK_CATEGORY, IK_FUNCTION,
-                     &req, sizeof(req), NULL,
-                     NULL, 0, NULL);
+    /* DosDevIOCtl(input, output, category, function, handle) */
+    rc = DosDevIOCtl(&req, &req, IK_CATEGORY, IK_FUNCTION, hf);
 
     if (rc != 0) {
-        printf("DosDevIOCTL failed: rc = %lu\n", rc);
+        printf("DosDevIOCtl failed: rc = %u\n", rc);
     } else {
         printf("IOCTL returned: nStatus = %u\n", req.nStatus);
         if (req.nStatus == 0) {
